@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+data/raw/*.parquet
+data/processed/*.parquet
+data/features/*.parquet
+models/artifacts/
+reports/*.png

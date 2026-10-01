@@ -1,0 +1,30 @@
+ensemble:
+  method: pinball_weighted
+lstm:
+  batch_size: 256
+  enabled: true
+  epochs: 12
+  learning_rate: 0.001
+  patience: 3
+  units: 64
+quick: false
+seed: 42
+tft:
+  batch_size: 256
+  d_model: 48
+  enabled: true
+  epochs: 10
+  heads: 1
+  learning_rate: 0.001
+  lstm_units: 48
+  patience: 3
+walk_forward:
+  folds: 2
+xgboost:
+  colsample_bytree: 0.9
+  early_stopping_rounds: 50
+  enabled: true
+  learning_rate: 0.05
+  max_depth: 6
+  n_estimators: 400
+  subsample: 0.9

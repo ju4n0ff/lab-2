@@ -1,0 +1,23 @@
+{
+  "n_rows_in": 49540,
+  "duplicates_dropped": 0,
+  "nan_per_column": {
+    "open": 0,
+    "high": 0,
+    "low": 0,
+    "close": 0,
+    "volume": 0
+  },
+  "invalid_rows_dropped": 0,
+  "gaps": 7,
+  "gap_ratio": 0.00014130281192595732,
+  "start": "2021-01-01 00:00:00+00:00",
+  "end": "2026-08-27 17:00:00+00:00",
+  "n_rows_out": 49540,
+  "quality_score": 100.0,
+  "timestamp_checks": {
+    "tz_utc": true,
+    "monotonic": true,
+    "unique": true
+  }
+}

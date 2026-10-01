@@ -1,0 +1,6 @@
+initial_capital: 10000
+fee_bps: 10
+half_spread_bps: 2
+slippage_bps: 5
+annualization_factor: 8760
+risk_free_annual: 0.0

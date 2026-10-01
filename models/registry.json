@@ -1,0 +1,46 @@
+{
+  "models": [
+    {
+      "experiment_id": "9a747431",
+      "version": "0.1.0+9a747431",
+      "status": "RESEARCH",
+      "date": "2026-08-21 01:23:46.370948+00:00"
+    },
+    {
+      "experiment_id": "778baf6c",
+      "version": "0.1.0+778baf6c",
+      "status": "RESEARCH",
+      "date": "2026-08-21 01:48:39.658558+00:00"
+    },
+    {
+      "experiment_id": "03119d71",
+      "version": "0.1.0+03119d71",
+      "status": "RESEARCH",
+      "date": "2026-08-21 01:50:11.056968+00:00"
+    },
+    {
+      "experiment_id": "c77ca201",
+      "version": "0.1.0+c77ca201",
+      "status": "RESEARCH",
+      "date": "2026-08-21 01:50:55.217889+00:00"
+    },
+    {
+      "experiment_id": "f20e192a",
+      "version": "0.1.0+f20e192a",
+      "status": "RESEARCH",
+      "date": "2026-08-21 01:52:13.062553+00:00"
+    },
+    {
+      "experiment_id": "0569a27a",
+      "version": "0.1.0+0569a27a",
+      "status": "RESEARCH",
+      "date": "2026-08-21 02:11:56.793671+00:00"
+    },
+    {
+      "experiment_id": "4161bda3",
+      "version": "0.1.0+4161bda3",
+      "status": "CANDIDATE",
+      "date": "2026-08-27 17:36:45.948853+00:00"
+    }
+  ]
+}

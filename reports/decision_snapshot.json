@@ -1,0 +1,42 @@
+{
+  "asset": "BTC/USDT",
+  "timestamp": "2026-08-19 17:00:00+00:00",
+  "action": "WAIT",
+  "confidence": 0.3114,
+  "horizon_hours": 4,
+  "expected_return": 0.001075,
+  "expected_return_net_of_risk_cost": -0.00112,
+  "prediction_interval": {
+    "lower": -0.015237,
+    "upper": 0.017387,
+    "coverage_target": 0.9
+  },
+  "probabilities": {
+    "positive_return": 0.5711,
+    "target_hit": 0.0,
+    "stop_hit": 0.0
+  },
+  "strategy": {
+    "number_of_transactions": 1,
+    "allocation_pct": 0.0
+  },
+  "risk": {
+    "stop_pct": 0.04,
+    "target_pct": 0.08,
+    "status": "PASS",
+    "reasons": [
+      "condiciones no cumplidas: p_up=0.57 (min 0.55), edge=-0.0011 (min 0.005)"
+    ]
+  },
+  "model": {
+    "forecast_models": [
+      "xgboost"
+    ],
+    "ensemble_weights": {
+      "xgboost": 1.0
+    },
+    "decision_rule": "rule_based_v1 (RL en fase posterior)",
+    "experiment_id": "4161bda3"
+  },
+  "status": "VALID"
+}

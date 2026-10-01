@@ -1,0 +1,12 @@
+max_position: 1.0
+max_daily_loss: 0.05
+vol_cap_annualized: 1.5
+min_data_quality: 60
+min_p_up: 0.55
+min_edge_net: 0.005
+lambda_risk: 0.15
+lambda_cost: 0.5
+conformal_alpha: 0.10
+stop_pct: 0.04
+target_pct: 0.08
+execution_mode: paper

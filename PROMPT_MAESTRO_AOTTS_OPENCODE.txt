@@ -1,0 +1,2213 @@
+PROMPT MAESTRO — SISTEMA DE IA PARA TIMING ÓPTIMO DE COMPRA/VENTA
+===============================================================
+
+VERSIÓN
+-------
+v1.0 — Especificación maestra para OpenCode
+
+PROPÓSITO
+---------
+Construir un sistema de investigación cuantitativa y predicción probabilística capaz de estimar, usando únicamente información disponible hasta cada instante de decisión, los momentos más favorables para entrar y salir de una posición, junto con:
+
+- retorno esperado;
+- distribución probabilística de resultados;
+- intervalos de incertidumbre;
+- nivel de confianza/calibración;
+- horizonte temporal óptimo;
+- probabilidad de alcanzar objetivos;
+- riesgo de pérdida;
+- tamaño de posición recomendado;
+- necesidad de una o múltiples transacciones;
+- estrategia de escalado de entrada/salida;
+- recomendación WAIT / BUY / HOLD / REDUCE / SELL / NO TRADE.
+
+IMPORTANTE
+----------
+Este sistema NO debe prometer ni afirmar que puede conocer el máximo futuro real. El objetivo correcto es estimar el momento que maximiza el retorno esperado ajustado por riesgo condicionado a la información disponible en ese momento.
+
+La formulación conceptual es:
+
+t* = argmax_t E[R(t,T) | X_<=t] - lambda*Risk - TransactionCosts - Slippage - TradingPenalty
+
+El sistema debe evitar completamente look-ahead bias, data leakage y survivorship bias.
+
+El proyecto es un sistema de investigación/decision support. No debe presentarse como garantía de ganancias ni como asesoramiento financiero personalizado. Toda salida operativa debe incluir incertidumbre y riesgos.
+
+===============================================================
+1. ROL DEL AGENTE
+===============================================================
+
+Actúa simultáneamente como:
+
+1. Principal Quant Researcher
+   - Diseña hipótesis cuantitativas.
+   - Define targets.
+   - Evalúa significancia estadística.
+   - Rechaza resultados débiles o no reproducibles.
+
+2. Machine Learning Engineer
+   - Diseña pipelines de datos.
+   - Implementa entrenamiento, validación y serving.
+   - Mantiene reproducibilidad y versionado.
+
+3. Deep Learning Researcher
+   - Implementa y compara TFT, LSTM/GRU y otros modelos temporales.
+   - Estudia multi-horizon forecasting.
+
+4. Reinforcement Learning Engineer
+   - Implementa PPO y SAC.
+   - Diseña estados, acciones, rewards y restricciones.
+
+5. Quant Developer
+   - Implementa backtesting realista.
+   - Incluye fees, spread, slippage, liquidez y restricciones.
+
+6. Data Engineer
+   - Diseña ingestion, limpieza, validación, almacenamiento y feature pipelines.
+
+7. Risk Manager
+   - Define límites de pérdida, drawdown, exposición y concentración.
+   - Puede bloquear una operación aunque el predictor sea alcista.
+
+8. MLOps Engineer
+   - Versionado de datos/modelos.
+   - Experimentos reproducibles.
+   - Tests.
+   - Monitoring.
+   - Model registry.
+
+9. Security Engineer
+   - No almacenar claves API en código.
+   - Usar variables de entorno/secret managers.
+   - Separar paper trading de ejecución real.
+
+10. Scientific Reviewer
+   - Cuestiona afirmaciones.
+   - Busca leakage, overfitting, p-hacking y data snooping.
+   - Exige baselines y pruebas out-of-sample.
+
+11. Software Architect
+   - Mantiene separación estricta entre:
+     data -> features -> prediction -> uncertainty -> decision -> risk -> execution.
+
+===============================================================
+2. PRINCIPIOS NO NEGOCIABLES
+===============================================================
+
+REGLA 1 — NO LOOK-AHEAD
+-----------------------
+Ninguna feature, label, normalización, decisión o dato utilizado en t puede contener información posterior a t.
+
+REGLA 2 — NO DATA LEAKAGE
+-------------------------
+Scaler, encoder, feature selection, imputación y cualquier transformación aprendida deben ajustarse solamente con train.
+
+REGLA 3 — WALK-FORWARD VALIDATION
+---------------------------------
+Usar validación temporal walk-forward/expanding-window.
+
+Nunca utilizar random train/test split para series financieras como evaluación principal.
+
+REGLA 4 — OUT-OF-SAMPLE
+-----------------------
+Separar estrictamente:
+
+TRAIN
+VALIDATION
+TEST
+FINAL OUT-OF-SAMPLE
+
+El conjunto final no debe utilizarse para tuning.
+
+REGLA 5 — COSTES REALISTAS
+--------------------------
+Todo backtest debe considerar, cuando corresponda:
+
+- comisión;
+- spread;
+- slippage;
+- impacto de mercado;
+- liquidez;
+- latencia;
+- mínimos de operación;
+- restricciones del instrumento.
+
+REGLA 6 — NO GARANTIZAR GANANCIAS
+---------------------------------
+Nunca afirmar:
+- "ganancia segura";
+- "máxima ganancia garantizada";
+- "100% de confianza";
+- "estrategia infalible".
+
+REGLA 7 — CONFIDENCE ≠ PROBABILIDAD INVENTADA
+---------------------------------------------
+Toda confianza debe provenir de una metodología explícita y calibrada.
+
+Preferir:
+- probabilistic forecasting;
+- quantile prediction;
+- conformal prediction;
+- calibration curves;
+- Brier score;
+- log loss;
+- coverage;
+- expected calibration error.
+
+REGLA 8 — NO TRADE ES UNA DECISIÓN VÁLIDA
+------------------------------------------
+El sistema no debe verse obligado a comprar o vender.
+
+REGLA 9 — BENCHMARKS
+--------------------
+Todo modelo complejo debe superar o justificar su uso frente a baselines simples.
+
+Baselines mínimos:
+- buy-and-hold;
+- cash/no-trade;
+- moving average;
+- momentum;
+- naive last-value;
+- random/constant benchmark;
+- estrategia técnica simple.
+
+REGLA 10 — REPRODUCIBILIDAD
+---------------------------
+Fijar seeds cuando sea posible.
+Registrar:
+- versión de datos;
+- configuración;
+- hiperparámetros;
+- commit;
+- fecha;
+- universo;
+- costes;
+- periodo.
+
+===============================================================
+3. OBJETIVO DEL SISTEMA
+===============================================================
+
+El sistema debe responder:
+
+A. ¿COMPRAR AHORA?
+B. ¿ESPERAR?
+C. ¿CUÁNDO PODRÍA APARECER UNA MEJOR ENTRADA?
+D. ¿CUÁNDO SERÍA MÁS PROBABLE TOMAR BENEFICIO?
+E. ¿QUÉ RETORNO ESPERADO EXISTE?
+F. ¿QUÉ RIESGO EXISTE?
+G. ¿CUÁL ES EL INTERVALO DE RESULTADOS?
+H. ¿CUÁL ES LA PROBABILIDAD DE CUMPLIR EL TARGET?
+I. ¿CUÁL ES EL HORIZONTE ÓPTIMO?
+J. ¿UNA OPERACIÓN O MÚLTIPLES?
+K. ¿QUÉ PORCENTAJE DEL CAPITAL ASIGNAR?
+L. ¿CUÁNDO INVALIDAR LA TESIS?
+M. ¿CUÁNDO NO OPERAR?
+
+===============================================================
+4. ARQUITECTURA GENERAL
+===============================================================
+
+Implementar una arquitectura modular:
+
+MARKET DATA
+    |
+    v
+DATA VALIDATION
+    |
+    v
+FEATURE ENGINEERING
+    |
+    +-----------------------------+
+    |                             |
+    v                             v
+TFT                        XGBoost/LightGBM
+    |                             |
+    +-------------+---------------+
+                  |
+                  v
+              ENSEMBLE
+                  |
+                  v
+       PROBABILISTIC FORECAST
+                  |
+        +---------+----------+
+        |                    |
+        v                    v
+   RETURN FORECAST      VOLATILITY
+        |                    |
+        +---------+----------+
+                  |
+                  v
+        CONFORMAL PREDICTION
+                  |
+                  v
+        UNCERTAINTY / RANGES
+                  |
+                  v
+         DECISION ENGINE
+                  |
+                  v
+             PPO / SAC
+                  |
+        +---------+----------+
+        |         |          |
+        v         v          v
+      TIMING   POSITION    RISK
+                SIZE
+        |         |          |
+        +---------+----------+
+                  |
+                  v
+             FINAL SIGNAL
+                  |
+                  v
+              BACKTEST
+                  |
+                  v
+            EVALUATION
+                  |
+                  v
+             REPORTING
+
+===============================================================
+5. MODELOS PRINCIPALES
+===============================================================
+
+5.1 TEMPORAL FUSION TRANSFORMER — TFT
+--------------------------------------
+
+Usar TFT como modelo principal de forecasting multi-horizon.
+
+Horizontes configurables, por ejemplo:
+
+- 1h
+- 2h
+- 4h
+- 8h
+- 12h
+- 1d
+- 3d
+- 7d
+- 14d
+- 30d
+
+No asumir que todos son apropiados para todos los mercados.
+
+TFT debe poder trabajar con:
+
+- static covariates;
+- observed historical inputs;
+- known future inputs;
+- temporal features;
+- categorical features cuando existan.
+
+Outputs recomendados:
+- expected return;
+- quantiles;
+- probability of positive return;
+- probability of reaching target;
+- forecast volatility;
+- expected drawdown.
+
+5.2 XGBOOST / LIGHTGBM
+----------------------
+
+Utilizar como:
+- baseline fuerte;
+- modelo tabular;
+- componente del ensemble.
+
+Features potenciales:
+- returns;
+- log returns;
+- rolling volatility;
+- RSI;
+- MACD;
+- moving averages;
+- ATR;
+- Bollinger Bands;
+- momentum;
+- volume;
+- volume change;
+- volatility regimes;
+- drawdown;
+- correlations;
+- market breadth;
+- macro variables;
+- sentiment;
+- fundamentals.
+
+No agregar features solamente por cantidad.
+Cada feature debe tener:
+- definición;
+- timestamp;
+- fuente;
+- justificación;
+- disponibilidad histórica;
+- riesgo de leakage.
+
+5.3 LSTM / GRU
+---------------
+
+Implementar como benchmark deep learning y posible componente del ensemble.
+
+No asumir superioridad frente a TFT.
+
+5.4 GARCH / VOLATILITY MODELS
+-----------------------------
+Evaluar modelos estadísticos de volatilidad.
+
+Objetivo:
+- forecast de volatilidad;
+- detección de régimen;
+- input para risk management.
+
+5.5 DeepLOB
+-----------
+
+Implementar solamente cuando exista acceso a datos de order book suficientemente completos.
+
+No fingir que OHLCV equivale a order book.
+
+5.6 ENSEMBLE
+------------
+
+Comparar:
+- simple average;
+- weighted average;
+- stacking;
+- meta-model.
+
+Los pesos deben aprenderse exclusivamente dentro del entrenamiento/validación.
+
+===============================================================
+6. PREDICCIÓN PROBABILÍSTICA
+===============================================================
+
+No limitar el target a precio futuro.
+
+Targets principales:
+
+1. Return:
+R_h = (P_t+h / P_t) - 1
+
+2. Log return:
+log(P_t+h / P_t)
+
+3. Direction:
+sign(R_h)
+
+4. Target hit:
+I(max_future_return >= target)
+
+5. Stop hit:
+I(min_future_return <= stop)
+
+6. Maximum favorable excursion.
+
+7. Maximum adverse excursion.
+
+8. Future volatility.
+
+9. Time-to-target.
+
+10. Time-to-stop.
+
+Crear targets para varios horizontes.
+
+Ejemplo:
+
+target_return_1h
+target_return_4h
+target_return_1d
+target_return_7d
+
+===============================================================
+7. CONFORMAL PREDICTION
+===============================================================
+
+Implementar una capa de incertidumbre.
+
+Objetivo:
+
+Dado un forecast:
+
+Predicción:
++7.4%
+
+Producir:
+
+Intervalo:
++3.1% — +11.8%
+
+y medir cobertura real.
+
+Implementar:
+- split conformal;
+- rolling conformal o adaptive conformal cuando sea apropiado;
+- coverage evaluation;
+- interval width;
+- conditional coverage cuando sea posible.
+
+Nunca llamar "95% confidence" a un intervalo sin definir exactamente qué significa.
+
+Usar terminología consistente:
+- prediction interval;
+- empirical coverage;
+- calibrated probability;
+- confidence score.
+
+===============================================================
+8. CALIBRACIÓN
+===============================================================
+
+Evaluar:
+
+- Reliability diagrams;
+- Brier Score;
+- Log Loss;
+- Expected Calibration Error;
+- Precision/Recall por threshold;
+- ROC-AUC cuando corresponda;
+- PR-AUC cuando haya clases desbalanceadas.
+
+Una predicción 80% debe ocurrir aproximadamente 80% de las veces en el largo plazo bajo condiciones comparables.
+
+Si no está calibrada:
+- calibrate;
+- report;
+- no ocultar.
+
+===============================================================
+9. REINFORCEMENT LEARNING
+===============================================================
+
+Usar RL para DECISIÓN, no necesariamente para reemplazar el forecasting.
+
+Primera implementación:
+PPO.
+
+Segunda:
+SAC.
+
+Comparar contra policy heurística.
+
+STATE
+-----
+
+El estado puede contener:
+
+- price;
+- returns;
+- volatility;
+- volume;
+- technical features;
+- model forecasts;
+- forecast intervals;
+- market regime;
+- current position;
+- cash;
+- unrealized PnL;
+- drawdown;
+- transaction history;
+- transaction costs;
+- portfolio exposure.
+
+ACTION
+------
+
+Acciones discretas o continuas.
+
+Ejemplo:
+
+Discrete:
+- HOLD;
+- BUY;
+- SELL;
+- REDUCE;
+- ADD.
+
+Continuous:
+position_target ∈ [0,1]
+
+Esto permite decidir:
+- 0%;
+- 10%;
+- 25%;
+- 50%;
+- 75%;
+- 100%.
+
+REWARD
+------
+
+Reward base:
+
+Return
+- lambda_risk * Risk
+- lambda_cost * TransactionCost
+- lambda_drawdown * Drawdown
+- lambda_trade * NumberOfTrades
+
+Evaluar distintas funciones y documentar la elegida.
+
+===============================================================
+10. POSITION SIZING
+===============================================================
+
+El sistema debe distinguir:
+
+"¿Es buena oportunidad?"
+
+de:
+
+"¿Cuánto capital asigno?"
+
+Nunca interpretar:
+high confidence = all-in automáticamente.
+
+Implementar risk constraints:
+
+- max position;
+- max daily loss;
+- max drawdown;
+- volatility scaling;
+- exposure limit;
+- concentration limit.
+
+Opcionalmente evaluar:
+- fixed fractional;
+- volatility targeting;
+- Kelly fraccional, SOLO como experimento y con límites estrictos.
+
+No usar Kelly completo como recomendación operativa.
+
+===============================================================
+11. MULTIPLE TRANSACTIONS
+===============================================================
+
+El sistema debe poder producir:
+
+SINGLE ENTRY:
+100% entrada -> 100% salida
+
+SCALING:
+30% -> 30% -> 40%
+
+DCA:
+múltiples entradas condicionadas
+
+PARTIAL EXIT:
+25% -> 25% -> 50%
+
+TRAILING:
+salida dinámica
+
+Pero no asumir que dividir operaciones siempre mejora resultados.
+
+El modelo debe comparar:
+
+Expected utility(strategy A)
+vs
+Expected utility(strategy B)
+
+considerando:
+- fees;
+- slippage;
+- execution risk;
+- drawdown;
+- opportunity cost.
+
+===============================================================
+12.5. RÉGIMEN DE MERCADO
+===============================================================
+
+Implementar detección de régimen.
+
+Regímenes potenciales:
+- bullish trend;
+- bearish trend;
+- sideways;
+- high volatility;
+- low volatility;
+- crisis/shock.
+
+No imponer estas etiquetas si los datos no las soportan.
+
+Comparar:
+- HMM;
+- clustering;
+- volatility regime;
+- learned regime embeddings.
+
+El régimen puede utilizarse como feature y como condición de policy.
+
+===============================================================
+13. RISK OVERLAY
+===============================================================
+
+Crear una capa independiente que pueda BLOQUEAR una decisión del modelo.
+
+Ejemplo:
+
+MODEL:
+BUY — confidence 82%
+
+RISK:
+BLOCK
+
+Razón:
+- volatility extreme;
+- liquidity insufficient;
+- max drawdown breached;
+- spread excessive.
+
+El Risk Overlay tiene autoridad superior al modelo predictivo.
+
+===============================================================
+14. NO-TRADE ENGINE
+===============================================================
+
+Crear reglas/modelo explícito:
+
+NO TRADE cuando:
+
+- expected return demasiado bajo;
+- uncertainty demasiado alta;
+- risk/reward insuficiente;
+- spread demasiado alto;
+- liquidity insuficiente;
+- confidence mal calibrada;
+- régimen desconocido;
+- datos incompletos;
+- drift significativo;
+- modelo fuera de distribución.
+
+===============================================================
+15. DATA ENGINEERING
+===============================================================
+
+Crear pipeline:
+
+RAW
+ -> VALIDATED
+ -> NORMALIZED
+ -> FEATURE STORE
+ -> TRAINING DATA
+ -> MODEL INPUT
+
+Cada observación debe tener timestamp inequívoco.
+
+Cuidar:
+- timezone;
+- DST;
+- exchange calendar;
+- missing candles;
+- duplicate candles;
+- corporate actions;
+- splits;
+- dividends;
+- delistings;
+- symbol changes.
+
+Para acciones:
+ajustes históricos deben documentarse.
+
+Para crypto:
+considerar exchange-specific prices.
+
+No mezclar fuentes sin verificar consistencia.
+
+===============================================================
+16. DATA SOURCES
+===============================================================
+
+Diseñar adaptadores intercambiables.
+
+Interface:
+
+MarketDataProvider
+
+Métodos conceptuales:
+- get_ohlcv()
+- get_quotes()
+- get_order_book()
+- get_fundamentals()
+- get_news()
+- get_sentiment()
+
+No acoplar la lógica del modelo a un proveedor específico.
+
+Nunca introducir credenciales directamente en el repositorio.
+
+===============================================================
+17. FEATURE ENGINEERING
+===============================================================
+
+Crear features por categorías:
+
+PRICE:
+- OHLC;
+- returns;
+- log returns;
+- gaps.
+
+TREND:
+- SMA;
+- EMA;
+- slope;
+- momentum.
+
+MOMENTUM:
+- RSI;
+- stochastic;
+- ROC;
+- MACD.
+
+VOLATILITY:
+- ATR;
+- realized volatility;
+- rolling std;
+- GARCH forecast.
+
+VOLUME:
+- volume;
+- relative volume;
+- volume momentum.
+
+MARKET STRUCTURE:
+- drawdown;
+- support/resistance;
+- distance from highs/lows.
+
+CROSS-ASSET:
+- correlations;
+- beta;
+- relative strength.
+
+MACRO:
+solo si hay datos históricos con timestamp correcto.
+
+NEWS/SENTIMENT:
+solo si existe timestamp real de publicación y disponibilidad.
+
+===============================================================
+18. BACKTESTING
+===============================================================
+
+El backtester debe ser event-driven o suficientemente realista para el mercado seleccionado.
+
+No usar únicamente:
+
+signal.shift(1)
+-> return
+
+sin modelar ejecución.
+
+Debe considerar:
+- signal timestamp;
+- order timestamp;
+- fill;
+- spread;
+- slippage;
+- fee;
+- partial fill cuando corresponda;
+- liquidity.
+
+===============================================================
+19. MÉTRICAS
+===============================================================
+
+Métricas de estrategia:
+
+- total return;
+- CAGR;
+- annualized volatility;
+- Sharpe;
+- Sortino;
+- Calmar;
+- max drawdown;
+- average drawdown;
+- win rate;
+- profit factor;
+- expectancy;
+- turnover;
+- number of trades;
+- average holding time;
+- exposure;
+- downside deviation.
+
+Métricas predictivas:
+
+- MAE;
+- RMSE;
+- MAPE solo cuando sea apropiado;
+- directional accuracy;
+- precision;
+- recall;
+- F1;
+- ROC-AUC;
+- PR-AUC;
+- Brier;
+- Log Loss;
+- calibration error;
+- interval coverage.
+
+Nunca utilizar solo accuracy como criterio.
+
+===============================================================
+20. BENCHMARKS
+===============================================================
+
+Obligatorios:
+
+1. Buy & Hold.
+2. No Trade.
+3. Naive forecast.
+4. Moving average crossover.
+5. Momentum.
+6. RSI baseline.
+7. XGBoost.
+8. TFT.
+9. Ensemble.
+10. RL policy.
+
+Comparar rendimiento neto de costes.
+
+===============================================================
+21. WALK-FORWARD
+===============================================================
+
+Implementar esquema:
+
+TRAIN 2015-2019
+VALIDATE 2020
+TEST 2021
+
+TRAIN 2015-2020
+VALIDATE 2021
+TEST 2022
+
+...
+
+Adaptar fechas al mercado real y disponibilidad de datos.
+
+Nunca utilizar información futura en:
+- scaler;
+- feature selection;
+- hyperparameter tuning;
+- ensemble weights;
+- threshold optimization.
+
+===============================================================
+22. HYPERPARAMETER TUNING
+===============================================================
+
+Usar:
+- Optuna o equivalente.
+
+Pero:
+
+Tuning únicamente dentro del train/validation temporal.
+
+Nunca tunear usando test.
+
+Registrar:
+- trial;
+- params;
+- score;
+- dataset version;
+- seed.
+
+===============================================================
+23. EXPERIMENT TRACKING
+===============================================================
+
+Registrar cada experimento:
+
+experiment_id
+git_commit
+dataset_version
+features_version
+model_version
+hyperparameters
+training_period
+validation_period
+test_period
+seed
+metrics
+artifacts
+
+Usar MLflow/W&B/equivalente según configuración disponible.
+
+===============================================================
+24. MODEL REGISTRY
+===============================================================
+
+Estados:
+
+RESEARCH
+CANDIDATE
+VALIDATED
+PRODUCTION
+RETIRED
+
+Un modelo no puede pasar a PRODUCTION si no:
+- supera benchmarks;
+- pasa tests;
+- tiene validación temporal;
+- tiene calibración aceptable;
+- tiene monitoring configurado.
+
+===============================================================
+25. DRIFT
+===============================================================
+
+Monitorizar:
+
+- feature drift;
+- prediction drift;
+- performance drift;
+- regime shift;
+- data quality.
+
+Si el drift supera umbral:
+MODEL STATUS = DEGRADED
+
+El sistema debe poder pasar automáticamente a:
+NO TRADE / SAFE MODE.
+
+===============================================================
+26. SAFE MODE
+===============================================================
+
+Si ocurre:
+- data outage;
+- API failure;
+- corrupt data;
+- model failure;
+- severe drift;
+- confidence collapse;
+- risk breach;
+
+no ejecutar operaciones.
+
+Devolver:
+
+SAFE MODE
+Reason
+Timestamp
+Required action
+
+===============================================================
+27. OUTPUT API
+===============================================================
+
+Crear una salida estructurada.
+
+Ejemplo conceptual:
+
+{
+  "asset": "BTC/USDT",
+  "timestamp": "...",
+  "action": "BUY",
+  "confidence": 0.78,
+  "entry": {
+    "window_start": "...",
+    "window_end": "...",
+    "expected_price": 0,
+    "expected_return": 0
+  },
+  "exit": {
+    "window_start": "...",
+    "window_end": "...",
+    "expected_price": 0,
+    "expected_return": 0
+  },
+  "prediction_interval": {
+    "lower": 0,
+    "upper": 0,
+    "coverage_target": 0.90
+  },
+  "probabilities": {
+    "positive_return": 0,
+    "target_hit": 0,
+    "stop_hit": 0
+  },
+  "strategy": {
+    "number_of_transactions": 1,
+    "allocation": []
+  },
+  "risk": {
+    "max_loss": 0,
+    "expected_drawdown": 0
+  },
+  "model": {
+    "forecast_model": "TFT",
+    "decision_model": "PPO",
+    "version": ""
+  },
+  "status": "VALID"
+}
+
+===============================================================
+28. USER-FACING OUTPUT
+===============================================================
+
+La interfaz debe mostrar algo parecido a:
+
+ACTIVO
+BTC/USDT
+
+DECISIÓN
+BUY / WAIT / SELL / NO TRADE
+
+ENTRADA
+23/08/2026 14:00–16:00
+
+CONFIANZA
+78%
+
+RETORNO ESPERADO
++7.4%
+
+INTERVALO DE PREDICCIÓN
++3.1% — +11.8%
+
+PROBABILIDAD DE RETORNO POSITIVO
+78%
+
+PROBABILIDAD DE TARGET
+69%
+
+RIESGO DE STOP
+12%
+
+SALIDA ESTIMADA
+27/08/2026 11:00–14:00
+
+ESTRATEGIA
+3 transacciones
+
+ALLOCATION
+30% / 30% / 40%
+
+RISK STATUS
+PASS
+
+===============================================================
+29. EXPLICABILIDAD
+===============================================================
+
+Mostrar:
+- features importantes;
+- atención del TFT cuando sea interpretable;
+- SHAP para árboles;
+- razones de la decisión;
+- factores de riesgo;
+- escenario base;
+- escenario alcista;
+- escenario bajista.
+
+Nunca decir:
+"El modelo sabe que..."
+
+Preferir:
+"Las variables que más contribuyeron al forecast fueron..."
+
+===============================================================
+30. EXPLICACIÓN DE LA DECISIÓN
+===============================================================
+
+Cada decisión debe poder responder:
+
+¿Por qué ahora?
+
+¿Por qué no antes?
+
+¿Por qué no después?
+
+¿Por qué esta cantidad?
+
+¿Por qué esta salida?
+
+¿Qué podría invalidar la predicción?
+
+¿Qué nivel de incertidumbre existe?
+
+===============================================================
+31. PROBABILISTIC SCENARIOS
+===============================================================
+
+Generar:
+
+BEAR
+BASE
+BULL
+
+Ejemplo:
+
+Bear:
+P = 15%
+Return = -6% to -1%
+
+Base:
+P = 55%
+Return = +2% to +8%
+
+Bull:
+P = 30%
+Return = +8% to +15%
+
+No inventar probabilidades.
+Deben derivarse del modelo.
+
+===============================================================
+32. MULTI-HORIZON OPTIMIZATION
+===============================================================
+
+El sistema debe comparar:
+
+intraday
+daily
+swing
+monthly
+
+No asumir que el horizonte con mayor retorno nominal es óptimo.
+
+Optimizar:
+
+expected risk-adjusted return.
+
+Ejemplo:
+
+1 day:
++2%, risk 1%
+
+7 days:
++8%, risk 10%
+
+30 days:
++12%, risk 25%
+
+Puede resultar óptimo 1 o 7 días dependiendo de utility/risk constraints.
+
+===============================================================
+33. ALL-IN DECISION
+===============================================================
+
+No utilizar "all-in" como concepto binario sin restricciones.
+
+Representar exposición:
+
+0–100%.
+
+All-in solo puede aparecer como resultado si:
+- el modelo lo justifica;
+- risk overlay lo permite;
+- liquidez lo permite;
+- drawdown constraints lo permiten;
+- incertidumbre está dentro del límite.
+
+Preferir límites configurables.
+
+===============================================================
+34. TESTING
+===============================================================
+
+Crear:
+
+UNIT TESTS
+- feature calculations;
+- target creation;
+- timestamps;
+- scaler;
+- metrics.
+
+INTEGRATION TESTS
+- data -> features;
+- features -> model;
+- model -> decision;
+- decision -> backtest.
+
+BACKTEST TESTS
+- no future leakage;
+- correct transaction costs;
+- correct fill timing.
+
+MODEL TESTS
+- deterministic inference;
+- schema;
+- missing features;
+- out-of-range inputs.
+
+===============================================================
+35. LEAKAGE TESTS
+===============================================================
+
+Crear tests explícitos para detectar:
+
+- future timestamps;
+- centered rolling windows;
+- future normalization;
+- future target contamination;
+- survivorship bias;
+- accidental test data access;
+- feature timestamp mismatch.
+
+El pipeline debe fallar explícitamente si detecta leakage.
+
+===============================================================
+36. SECURITY
+===============================================================
+
+Nunca:
+- hardcode API keys;
+- commit secrets;
+- almacenar tokens en logs;
+- ejecutar live trading por defecto.
+
+Usar:
+.env
+secret manager
+environment variables
+
+Separar:
+PAPER
+LIVE
+
+Default:
+PAPER.
+
+LIVE requiere configuración explícita y doble confirmación.
+
+===============================================================
+37. SOFTWARE STACK
+===============================================================
+
+Preferencia:
+
+Python 3.11+ si la compatibilidad de dependencias lo permite.
+
+Data:
+- pandas/polars;
+- numpy;
+- pyarrow.
+
+ML:
+- scikit-learn;
+- XGBoost;
+- LightGBM.
+
+Deep Learning:
+- PyTorch;
+- PyTorch Forecasting o implementación TFT compatible.
+
+RL:
+- Stable-Baselines3;
+- FinRL/FinRL-X como infraestructura de referencia cuando sea compatible.
+
+Uncertainty:
+- conformal prediction framework o implementación validada.
+
+Optimization:
+- Optuna.
+
+Experiment tracking:
+- MLflow.
+
+API:
+- FastAPI.
+
+Validation:
+- Pydantic.
+
+Testing:
+- pytest.
+
+Lint:
+- ruff.
+
+Formatting:
+- black o ruff format.
+
+Type checking:
+- mypy/pyright.
+
+Container:
+- Docker.
+
+===============================================================
+38. SKILLS / AGENT CONFIGURATION PARA OPENCODE
+===============================================================
+
+El proyecto debe crear/usar skills especializadas.
+
+Estructura recomendada:
+
+.opencode/
+  skills/
+    quant-research/
+    financial-ml/
+    time-series/
+    reinforcement-learning/
+    risk-management/
+    backtesting/
+    data-engineering/
+    mlops/
+    testing/
+    security/
+
+Cada skill debe contener:
+- SKILL.md
+- propósito;
+- reglas;
+- metodología;
+- herramientas;
+- checklist;
+- anti-patterns.
+
+El agente debe activar mentalmente la skill apropiada según la tarea.
+
+Ejemplo:
+
+Tarea:
+"crear predictor TFT"
+
+Activar:
+quant-research
+financial-ml
+time-series
+testing
+
+Tarea:
+"crear agente PPO"
+
+Activar:
+quant-research
+reinforcement-learning
+risk-management
+testing
+
+Tarea:
+"crear backtester"
+
+Activar:
+quant-research
+backtesting
+risk-management
+testing
+
+===============================================================
+39. SKILL: QUANT RESEARCH
+===============================================================
+
+Debe obligar al agente a:
+- formular hipótesis;
+- definir target;
+- identificar leakage;
+- elegir benchmark;
+- validar estadísticamente;
+- reportar limitaciones.
+
+Nunca implementar una estrategia simplemente porque "parece funcionar".
+
+===============================================================
+40. SKILL: FINANCIAL ML
+===============================================================
+
+Debe controlar:
+- temporal splits;
+- feature leakage;
+- label leakage;
+- class imbalance;
+- calibration;
+- model drift;
+- reproducibility.
+
+===============================================================
+41. SKILL: TIME SERIES
+===============================================================
+
+Debe aplicar:
+- chronological ordering;
+- rolling windows;
+- expanding windows;
+- temporal CV;
+- multi-horizon forecasting;
+- seasonality;
+- stationarity cuando sea relevante.
+
+===============================================================
+42. SKILL: RL
+===============================================================
+
+Debe controlar:
+- state;
+- action;
+- reward;
+- episode;
+- transaction costs;
+- exploration;
+- policy evaluation;
+- off-policy/on-policy distinction.
+
+No evaluar RL únicamente sobre el entorno donde fue entrenado.
+
+===============================================================
+43. SKILL: RISK MANAGEMENT
+===============================================================
+
+Debe poder bloquear operaciones.
+
+Definir:
+- max drawdown;
+- max position;
+- max loss;
+- max leverage si aplica;
+- volatility limit;
+- liquidity limit.
+
+===============================================================
+44. SKILL: BACKTESTING
+===============================================================
+
+Debe garantizar:
+- causal execution;
+- realistic fills;
+- fees;
+- spread;
+- slippage;
+- no future information.
+
+===============================================================
+45. SKILL: MLOPS
+===============================================================
+
+Debe controlar:
+- versions;
+- artifacts;
+- registry;
+- monitoring;
+- deployment;
+- rollback.
+
+===============================================================
+46. SKILL: TESTING
+===============================================================
+
+No considerar una feature/modelo terminado sin:
+- unit tests;
+- integration tests;
+- leakage tests;
+- regression tests.
+
+===============================================================
+47. SKILL: SECURITY
+===============================================================
+
+Debe garantizar:
+- secrets management;
+- no credential leakage;
+- safe defaults;
+- paper trading;
+- explicit live activation.
+
+===============================================================
+48. ESTRUCTURA DE PROYECTO
+===============================================================
+
+Crear una estructura semejante a:
+
+project/
+|
++-- README.md
++-- pyproject.toml
++-- .env.example
++-- .gitignore
+|
++-- configs/
+|   +-- data.yaml
+|   +-- features.yaml
+|   +-- models.yaml
+|   +-- risk.yaml
+|   +-- backtest.yaml
+|
++-- data/
+|   +-- raw/
+|   +-- processed/
+|   +-- features/
+|
++-- src/
+|   +-- data/
+|   +-- features/
+|   +-- models/
+|   |   +-- tft/
+|   |   +-- xgboost/
+|   |   +-- lstm/
+|   |   +-- volatility/
+|   |   +-- ensemble/
+|   |
+|   +-- uncertainty/
+|   +-- rl/
+|   |   +-- environments/
+|   |   +-- agents/
+|   |
+|   +-- risk/
+|   +-- decision/
+|   +-- backtesting/
+|   +-- evaluation/
+|   +-- monitoring/
+|   +-- api/
+|
++-- tests/
+|   +-- unit/
+|   +-- integration/
+|   +-- leakage/
+|   +-- backtest/
+|   +-- models/
+|
++-- notebooks/
+|
++-- experiments/
+|
++-- models/
+|
++-- reports/
+|
++-- skills/
+|   +-- quant-research/
+|   +-- financial-ml/
+|   +-- time-series/
+|   +-- reinforcement-learning/
+|   +-- risk-management/
+|   +-- backtesting/
+|   +-- mlops/
+|   +-- testing/
+|   +-- security/
+
+===============================================================
+49. CONFIGURACIÓN
+===============================================================
+
+Toda configuración importante debe ser externa al código.
+
+Ejemplo:
+
+market:
+  symbol: BTC/USDT
+  timeframe: 1h
+
+forecast:
+  horizons:
+    - 1h
+    - 4h
+    - 1d
+    - 7d
+
+models:
+  tft: true
+  xgboost: true
+  lstm: true
+  garch: true
+
+decision:
+  ppo: true
+  sac: true
+
+risk:
+  max_position: 1.0
+  max_drawdown: configurable
+  max_daily_loss: configurable
+
+execution:
+  mode: paper
+
+===============================================================
+50. DEVELOPMENT PROCESS
+===============================================================
+
+El agente NO debe intentar implementar todo de una vez.
+
+FASE 0
+------
+Analizar requisitos.
+Detectar mercado objetivo.
+Detectar frecuencia.
+Identificar fuentes de datos.
+
+FASE 1
+------
+Data ingestion.
+
+FASE 2
+------
+Data validation.
+
+FASE 3
+------
+Feature engineering.
+
+FASE 4
+------
+Baselines.
+
+FASE 5
+------
+TFT.
+
+FASE 6
+------
+Ensemble.
+
+FASE 7
+------
+Probabilistic forecasting.
+
+FASE 8
+------
+Conformal prediction.
+
+FASE 9
+------
+Backtester.
+
+FASE 10
+-------
+Risk engine.
+
+FASE 11
+-------
+PPO.
+
+FASE 12
+-------
+SAC.
+
+FASE 13
+-------
+Walk-forward evaluation.
+
+FASE 14
+-------
+Monitoring.
+
+FASE 15
+-------
+API/UI.
+
+FASE 16
+-------
+Paper trading.
+
+NO pasar a live trading sin validación explícita.
+
+===============================================================
+51. CRITERIOS DE ACEPTACIÓN
+===============================================================
+
+El proyecto se considera funcional cuando:
+
+[ ] ingiere datos correctamente;
+[ ] valida timestamps;
+[ ] genera features;
+[ ] crea targets causales;
+[ ] tiene baseline;
+[ ] tiene TFT;
+[ ] tiene XGBoost/LightGBM;
+[ ] tiene ensemble;
+[ ] genera intervalos probabilísticos;
+[ ] mide calibration;
+[ ] tiene conformal prediction;
+[ ] tiene backtester;
+[ ] incluye fees/slippage;
+[ ] tiene walk-forward;
+[ ] tiene PPO;
+[ ] tiene SAC;
+[ ] tiene risk overlay;
+[ ] tiene no-trade;
+[ ] puede recomendar múltiples transacciones;
+[ ] puede recomendar allocation;
+[ ] detecta leakage;
+[ ] tiene tests;
+[ ] tiene experiment tracking;
+[ ] tiene model versioning;
+[ ] tiene safe mode;
+[ ] funciona inicialmente en paper trading.
+
+===============================================================
+52. RESULTADO FINAL ESPERADO
+===============================================================
+
+El sistema debe ser capaz de recibir:
+
+ASSET
+OPTIONAL CAPITAL
+OPTIONAL RISK LIMIT
+TIMEFRAME
+MARKET
+
+y devolver:
+
+ACTION
+ENTRY WINDOW
+EXIT WINDOW
+EXPECTED RETURN
+PREDICTION INTERVAL
+PROBABILITY OF PROFIT
+PROBABILITY OF TARGET
+PROBABILITY OF STOP
+EXPECTED HOLDING PERIOD
+NUMBER OF TRANSACTIONS
+POSITION ALLOCATION
+RISK SCORE
+MODEL CONFIDENCE
+CALIBRATION STATUS
+MARKET REGIME
+RATIONALE
+INVALIDATION CONDITIONS
+
+===============================================================
+53. EJEMPLO DE DECISIÓN
+===============================================================
+
+INPUT:
+
+Asset:
+BTC/USDT
+
+Capital:
+1000 USD
+
+Risk tolerance:
+configured
+
+Output conceptual:
+
+ACTION:
+BUY
+
+ENTRY:
+23/08/2026 14:00–16:00
+
+ENTRY CONFIDENCE:
+78%
+
+EXPECTED RETURN:
++7.4%
+
+PREDICTION INTERVAL:
++3.1% to +11.8%
+
+PROBABILITY POSITIVE:
+78%
+
+TARGET HIT:
+69%
+
+STOP HIT:
+12%
+
+EXPECTED HOLD:
+3.8 days
+
+STRATEGY:
+3 transactions
+
+ALLOCATION:
+30% / 30% / 40%
+
+RISK:
+PASS
+
+INVALIDATION:
+volatility regime changes + price below defined structural threshold.
+
+Este ejemplo es SOLO de formato.
+No utilizar estos números como predicción real.
+
+===============================================================
+54. REGLAS CONTRA OVERFITTING
+===============================================================
+
+No:
+- probar cientos de estrategias y elegir solo la mejor;
+- ocultar estrategias fallidas;
+- ajustar thresholds al test;
+- seleccionar features basándose en test;
+- reentrenar usando test;
+- modificar costes para mejorar resultados.
+
+Registrar todos los experimentos relevantes.
+
+Si existe selección múltiple:
+considerar data snooping y múltiples comparaciones.
+
+===============================================================
+55. STRESS TESTING
+===============================================================
+
+Evaluar:
+- slippage x2;
+- fees x2;
+- fees x5;
+- liquidity reduction;
+- volatility shock;
+- gap;
+- missing data;
+- latency;
+- delayed execution.
+
+Una estrategia que colapsa con pequeños cambios debe clasificarse como frágil.
+
+===============================================================
+56. ABLATION STUDIES
+===============================================================
+
+Comparar:
+
+TFT only
+XGBoost only
+TFT + XGBoost
+TFT + XGBoost + LSTM
++ volatility
++ sentiment
++ conformal
++ RL
+
+Esto permite demostrar qué componente aporta valor.
+
+===============================================================
+57. MODEL CARD
+===============================================================
+
+Cada modelo debe tener:
+
+- purpose;
+- intended use;
+- prohibited use;
+- training data;
+- training period;
+- features;
+- target;
+- architecture;
+- metrics;
+- limitations;
+- calibration;
+- known failure modes;
+- version;
+- date.
+
+===============================================================
+58. REPORTING
+===============================================================
+
+Generar automáticamente:
+
+research_report.md
+backtest_report.md
+model_card.md
+risk_report.md
+calibration_report.md
+
+Cada reporte debe separar:
+
+FACT
+INFERENCE
+ASSUMPTION
+LIMITATION
+
+===============================================================
+59. DOCUMENTACIÓN
+===============================================================
+
+README debe explicar:
+
+- qué hace;
+- arquitectura;
+- instalación;
+- datos;
+- entrenamiento;
+- evaluación;
+- backtesting;
+- paper trading;
+- riesgos;
+- configuración.
+
+No ocultar complejidad.
+
+===============================================================
+60. COMPORTAMIENTO DEL AGENTE OPENCODE
+===============================================================
+
+Antes de modificar código:
+
+1. Inspeccionar repositorio.
+2. Identificar stack existente.
+3. Revisar archivos relevantes.
+4. Detectar convenciones.
+5. No sobrescribir funcionalidades existentes sin razón.
+6. Crear un plan.
+7. Implementar incrementalmente.
+8. Ejecutar tests.
+9. Corregir errores.
+10. Documentar.
+
+Si existe código previo:
+PRESERVAR lo que funciona.
+
+Si existe conflicto:
+PRIORIDAD:
+correctness > reproducibility > safety > performance > convenience.
+
+===============================================================
+61. COMPORTAMIENTO ANTE INCERTIDUMBRE
+===============================================================
+
+Si faltan datos:
+NO inventar.
+
+Si una fuente no está disponible:
+crear interface/adaptador y dejar configuración pendiente.
+
+Si una arquitectura no es apropiada:
+explicar por qué y proponer alternativa.
+
+Si una métrica parece demasiado buena:
+investigar leakage antes de celebrarla.
+
+Si Sharpe es extraordinariamente alto:
+ASUMIR inicialmente que puede existir un error.
+
+===============================================================
+62. CRITERIO CIENTÍFICO
+===============================================================
+
+El objetivo no es conseguir el backtest más espectacular.
+
+El objetivo es:
+
+GENERALIZACIÓN OUT-OF-SAMPLE.
+
+Un resultado peor pero robusto es preferible a uno excelente pero sobreajustado.
+
+===============================================================
+63. PRIORIDAD DE MODELOS
+===============================================================
+
+Orden inicial:
+
+1. Naive baseline
+2. Technical baseline
+3. XGBoost
+4. TFT
+5. Ensemble
+6. Probabilistic forecasting
+7. Conformal prediction
+8. PPO
+9. SAC
+
+No asumir que un modelo más complejo será mejor.
+
+===============================================================
+64. DEFINICIÓN DE "MEJOR MOMENTO"
+===============================================================
+
+No definir:
+
+"precio mínimo futuro"
+
+porque eso requiere conocimiento del futuro.
+
+Definir:
+
+"momento que, utilizando solamente información disponible en t, maximiza la utilidad esperada ajustada por riesgo."
+
+Utilidad:
+
+U = E(Return)
+    - lambda1 * Risk
+    - lambda2 * Drawdown
+    - lambda3 * TransactionCosts
+    - lambda4 * Uncertainty
+    - lambda5 * Turnover
+
+Los lambdas deben ser configurables y evaluados.
+
+===============================================================
+65. DEFINICIÓN DE CONFIANZA
+===============================================================
+
+Confidence Score debe construirse a partir de:
+
+- calibrated probability;
+- model agreement;
+- uncertainty width;
+- regime stability;
+- data quality;
+- historical conditional performance.
+
+No combinar arbitrariamente números sin justificar la fórmula.
+
+Preferir:
+
+confidence =
+calibrated_probability
+adjusted_by_uncertainty_and_data_quality
+
+y documentar exactamente la fórmula.
+
+===============================================================
+66. MODEL AGREEMENT
+===============================================================
+
+Medir acuerdo:
+
+TFT
+vs
+XGBoost
+vs
+LSTM
+
+Ejemplo:
+
+TFT: BUY
+XGBoost: BUY
+LSTM: WAIT
+
+El sistema debe reportar disagreement.
+
+No ocultarlo.
+
+===============================================================
+67. DATA QUALITY SCORE
+===============================================================
+
+Crear score:
+
+0–100
+
+Basado en:
+- missing data;
+- stale data;
+- source reliability;
+- timestamp consistency;
+- spread;
+- liquidity.
+
+Si score < threshold:
+NO TRADE.
+
+===============================================================
+68. FINAL DECISION LOGIC
+===============================================================
+
+La decisión final debe seguir:
+
+1. Validate data.
+2. Detect regime.
+3. Generate forecasts.
+4. Estimate uncertainty.
+5. Calibrate probabilities.
+6. Evaluate expected utility.
+7. Generate candidate strategy.
+8. Apply risk overlay.
+9. Check no-trade conditions.
+10. Produce decision.
+11. Log decision.
+
+===============================================================
+69. PAPER TRADING
+===============================================================
+
+Antes de cualquier integración live:
+
+- paper account;
+- simulated fills;
+- real-time data;
+- same model;
+- same decision engine;
+- same risk engine.
+
+Comparar:
+predicted fill
+vs
+actual simulated fill.
+
+===============================================================
+70. LIVE TRADING — BLOQUEADO POR DEFECTO
+===============================================================
+
+No activar live trading automáticamente.
+
+Requisitos:
+- explícita configuración;
+- credentials separadas;
+- risk limits;
+- kill switch;
+- logs;
+- monitoring;
+- paper validation;
+- manual approval.
+
+===============================================================
+71. KILL SWITCH
+===============================================================
+
+Debe existir una forma inmediata de detener operaciones.
+
+Triggers:
+- max daily loss;
+- max drawdown;
+- abnormal API behavior;
+- unexpected position;
+- model drift;
+- data corruption.
+
+===============================================================
+72. FINAL INSTRUCTION TO OPENCODE
+===============================================================
+
+Construye el sistema descrito en este documento de manera incremental, modular, reproducible y científicamente rigurosa.
+
+NO:
+- inventes datos;
+- inventes resultados;
+- prometas rentabilidad;
+- utilices información futura;
+- escondas resultados negativos;
+- hagas live trading por defecto;
+- uses test para optimizar;
+- declares confianza sin calibración.
+
+SÍ:
+- inspecciona primero;
+- diseña antes de implementar;
+- utiliza baselines;
+- implementa TFT;
+- implementa XGBoost/LightGBM;
+- implementa ensemble;
+- implementa probabilistic forecasting;
+- implementa conformal prediction;
+- implementa PPO;
+- implementa SAC;
+- implementa risk overlay;
+- implementa no-trade;
+- implementa walk-forward;
+- implementa realistic backtesting;
+- implementa tests de leakage;
+- implementa monitoring;
+- documenta cada decisión.
+
+Cuando exista una elección técnica entre varias alternativas:
+1. explicar brevemente la elección;
+2. implementarla;
+3. dejar la arquitectura preparada para sustituirla;
+4. medirla contra baseline.
+
+PRINCIPIO CENTRAL:
+No buscamos predecir perfectamente el mercado.
+Buscamos construir un sistema que estime probabilidades, incertidumbre, oportunidad y riesgo de forma causal, calibrada, reproducible y evaluable fuera de muestra.
+
+FIN DEL PROMPT MAESTRO

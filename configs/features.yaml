@@ -1,0 +1,18 @@
+lookback: 64
+decoder_len: 24
+windows:
+  sma_fast: 12
+  sma_slow: 48
+  ema: 21
+  rsi: 14
+  atr: 14
+  bb: 20
+  bb_k: 2.0
+  roc: 12
+  rv: 24
+  relvol: 24
+  dd: 168
+  hi_lo: 168
+horizons_hours: [4, 24, 168]
+quantiles: [0.1, 0.25, 0.5, 0.75, 0.9]
+include_calendar: true

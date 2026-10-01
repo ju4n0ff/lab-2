@@ -1,0 +1,18 @@
+market:
+  symbol: BTCUSDT
+  timeframe: 1h
+provider: binance
+history:
+  start: "2021-01-01"
+  end: null
+splits:
+  train_start: "2021-01-01"
+  train_end: "2024-06-30"
+  val_start: "2024-07-01"
+  val_end: "2025-06-30"
+  test_start: "2025-07-01"
+  test_end: null
+paths:
+  raw: data/raw
+  processed: data/processed
+  features: data/features
